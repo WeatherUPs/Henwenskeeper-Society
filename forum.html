@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Henwenskeeper | Forums</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAi_ufBpDeiU-v2YWiY-jqyrgI5FHKG2HA",
+            authDomain: "henwenskeeper.firebaseapp.com",
+            projectId: "henwenskeeper",
+            storageBucket: "henwenskeeper.firebasestorage.app",
+            appId: "1:980447588400:web:ce0ca551246ae1ecc9fdf5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentPostId = null;
+        let isAdmin = false;
+
+        // 1. AUTH & ADMIN CHECK
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userSnap = await getDoc(doc(db, "users", user.uid));
+                if (userSnap.exists() && userSnap.data().rank === "Admin") {
+                    isAdmin = true;
+                    document.getElementById('admin-btn-container').style.display = 'block';
+                }
+            }
+        });
+
+        // 2. FETCH POSTS (Grid Design)
+        const q = query(collection(db, "posts"), orderBy("timestamp", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const myFeed = document.getElementById('my-posts-grid');
+            const communityFeed = document.getElementById('community-posts-grid');
+            myFeed.innerHTML = ""; communityFeed.innerHTML = "";
+
+            snapshot.forEach((docSnap) => {
+                const p = docSnap.data();
+                const card = `
+                    <div class="grid-card" onclick="openDetail('${docSnap.id}')">
+                        <div class="card-thumb" style="background-image:url('${p.img || 'background.png'}')"></div>
+                        <div class="card-info">
+                            <div style="font-size:16px; color:white;">${p.title}</div>
+                            <div style="font-size:10px; color:#aaa;">${new Date(p.timestamp).toLocaleDateString()}</div>
+                        </div>
+                    </div>`;
+                
+                if (p.authorRank === "Admin") myFeed.innerHTML += card;
+                else communityFeed.innerHTML += card;
+            });
+        });
+
+        // 3. CREATE POST LOGIC
+        window.savePost = async () => {
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+            const img = document.getElementById('post-img').value;
+            if(!title || !content) return alert("Title and Content are required!");
+
+            await addDoc(collection(db, "posts"), {
+                title, content, img, authorRank: "Admin", timestamp: Date.now()
+            });
+            closeModal();
+        };
+
+        // 4. OPEN DETAIL & DELETE LOGIC
+        window.openDetail = async (id) => {
+            currentPostId = id;
+            const p = await getDoc(doc(db, "posts", id));
+            document.getElementById('det-title').innerText = p.data().title;
+            document.getElementById('det-content').innerText = p.data().content;
+            
+            // Only show delete button to Admin
+            document.getElementById('admin-delete-btn').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('detail-modal').style.display = 'flex';
+
+            // Load Comments
+            const cq = query(collection(db, `posts/${id}/comments`), orderBy("time", "asc"));
+            onSnapshot(cq, (snap) => {
+                const box = document.getElementById('com-box');
+                box.innerHTML = "";
+                snap.forEach(c => box.innerHTML += `<div><b style="color:gold">${c.data().user}:</b> ${c.data().text}</div>`);
+            });
+        };
+
+        window.deletePost = async () => {
+            if (confirm("Delete this post forever?")) {
+                await deleteDoc(doc(db, "posts", currentPostId));
+                closeModal();
+            }
+        };
+
+        window.sendComment = async () => {
+            const input = document.getElementById('com-input');
+            if(!input.value.trim()) return;
+            await addDoc(collection(db, `posts/${currentPostId}/comments`), {
+                text: input.value,
+                user: auth.currentUser ? auth.currentUser.email.split('@')[0] : "Guest",
+                time: Date.now()
+            });
+            input.value = "";
+        };
+
+        window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        window.showCreateModal = () => document.getElementById('create-modal').style.display = 'flex';
+    </script>
+</head>
+<body>
+    <h1 class="title">FORUMS</h1>
+    
+    <div id="admin-btn-container" style="display:none; margin-bottom: 20px;">
+        <button class="mc-btn" style="width:240px; background:#3C8527;" onclick="showCreateModal()">+ CREATE POST</button>
+    </div>
+
+    <div class="section-label">MY POSTS</div>
+    <div id="my-posts-grid" class="grid-container"></div>
+
+    <div class="section-label" style="color:#aaa;">COMMUNITY</div>
+    <div id="community-posts-grid" class="grid-container"></div>
+
+    <a href="index.html" class="mc-btn" style="width:200px; margin:40px 0;">BACK</a>
+
+    <div id="create-modal" class="modal">
+        <div class="panel">
+            <h2 class="title" style="font-size:32px; margin:0 0 15px 0;">NEW POST</h2>
+            <input type="text" id="post-title" placeholder="Post Title...">
+            <textarea id="post-content" placeholder="Description..." style="height:100px;"></textarea>
+            <input type="text" id="post-img" placeholder="Thumbnail URL">
+            <button class="mc-btn" style="background:#3C8527;" onclick="savePost()">POST</button>
+            <button class="mc-btn" style="background:#800;" onclick="closeModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal">
+        <div class="panel">
+            <h2 id="det-title" style="color:#55FF55; margin-top:0;"></h2>
+            <p id="det-content" style="background:rgba(0,0,0,0.5); padding:10px; border:1px solid #555;"></p>
+            
+            <button id="admin-delete-btn" class="mc-btn" style="background:#AA0000; display:none; margin-bottom:15px;" onclick="deletePost()">DELETE POST</button>
+
+            <div style="color:gold; margin-bottom:5px;">COMMENTS</div>
+            <div id="com-box" style="height:120px; overflow-y:auto; background:#111; padding:10px; margin-bottom:10px;"></div>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="com-input" placeholder="Type..." style="margin:0;">
+                <button class="mc-btn" style="width:80px; padding:0; background:#3C8527;" onclick="sendComment()">SEND</button>
+            </div>
+            <button class="mc-btn" style="margin-top:15px;" onclick="closeModal()">CLOSE</button>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Henwenskeeper Account</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAi_ufBpDeiU-v2YWiY-jqyrgI5FHKG2HA",
+            authDomain: "henwenskeeper.firebaseapp.com",
+            projectId: "henwenskeeper",
+            storageBucket: "henwenskeeper.firebasestorage.app",
+            messagingSenderId: "980447588400",
+            appId: "1:980447588400:web:ce0ca551246ae1ecc9fdf5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider(); // Needed for Google Login
+
+        // --- AUTH LOGIC ---
+        onAuthStateChanged(auth, async (user) => {
+            const loginPanel = document.getElementById('login-panel');
+            const profilePanel = document.getElementById('profile-panel');
+
+            if (user) {
+                loginPanel.style.display = 'none';
+                profilePanel.style.display = 'block';
+                
+                const userRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userRef);
+
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    document.getElementById('display-user').innerText = userData.username;
+                    document.getElementById('display-rank').innerText = userData.rank || "Member";
+                    document.getElementById('display-email').innerText = user.email;
+                    document.getElementById('user-avatar').src = user.photoURL || 'background.png';
+
+                    // Rank Colors
+                    const rankEl = document.getElementById('display-rank');
+                    if (userData.rank === "Admin") {
+                        rankEl.style.color = "#FF5555";
+                        document.getElementById('admin-tools').style.display = 'block';
+                    } else if (userData.rank === "Moderator") {
+                        rankEl.style.color = "#55FFFF";
+                    } else {
+                        rankEl.style.color = "#55FF55";
+                    }
+                } else {
+                    // Create Firestore doc if it doesn't exist
+                    await setDoc(userRef, {
+                        username: user.displayName || user.email.split('@')[0],
+                        rank: "Member",
+                        email: user.email,
+                        joined: Date.now()
+                    });
+                }
+            } else {
+                loginPanel.style.display = 'block';
+                profilePanel.style.display = 'none';
+            }
+        });
+
+        // --- LOGIN FUNCTIONS ---
+        window.login = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('pass').value;
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert(e.message); }
+        };
+
+        window.register = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('pass').value;
+            try {
+                const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                await setDoc(doc(db, "users", cred.user.uid), {
+                    username: email.split('@')[0],
+                    rank: "Member",
+                    email: email,
+                    joined: Date.now()
+                });
+            } catch (e) { alert(e.message); }
+        };
+
+        window.googleLogin = async () => {
+            try {
+                // This fix ensures the window stays open
+                await signInWithPopup(auth, provider);
+            } catch (e) { 
+                console.error(e);
+                if(e.code !== "auth/cancelled-closure-interaction") alert(e.message); 
+            }
+        };
+
+        window.logout = () => signOut(auth);
+
+        window.assignRank = async () => {
+            const targetID = document.getElementById('target-uid').value;
+            const newRank = document.getElementById('rank-select').value;
+            try {
+                await updateDoc(doc(db, "users", targetID), { rank: newRank });
+                alert("Rank Updated!");
+            } catch (e) { alert("Error: Permission Denied"); }
+        };
+    </script>
+</head>
+<body>
+    <h1 class="title">ACCOUNT</h1>
+    
+    <div id="login-panel" class="panel">
+        <h3>SIGN IN</h3>
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="pass" placeholder="Password">
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="mc-btn" onclick="window.login()">LOGIN</button>
+            <button class="mc-btn" onclick="window.register()">CREATE ACCOUNT</button>
+            <button class="mc-btn" onclick="window.googleLogin()" style="background:#4285F4; border-color:#357ae8;">SIGN IN WITH GOOGLE</button>
+            <a href="index.html" class="mc-btn" style="background:#555;">BACK</a>
+        </div>
+    </div>
+
+    <div id="profile-panel" class="panel" style="display:none; text-align:center;">
+        <img id="user-avatar" src="" style="width:80px; height:80px; border:4px solid #000; margin-bottom:10px;">
+        <h3>PLAYER PROFILE</h3>
+        <p><strong>Name:</strong> <span id="display-user" style="color:yellow;">...</span></p>
+        <p><strong>Rank:</strong> <span id="display-rank">...</span></p>
+        <p style="font-size:12px; color:#aaa;">Email: <span id="display-email"></span></p>
+
+        <div id="admin-tools" style="display:none; border-top: 2px dashed #555; margin-top:20px; padding-top:10px;">
+            <h4 style="color:#FF5555;">[ADMIN PANEL]</h4>
+            <input type="text" id="target-uid" placeholder="User ID (UID)">
+            <select id="rank-select" style="padding:10px; background:#333; color:white; border:2px solid #555; width:100%; margin-bottom:10px;">
+                <option value="Member">Member</option>
+                <option value="Moderator">Moderator</option>
+                <option value="Admin">Admin</option>
+            </select>
+            <button class="mc-btn" style="background:#800;" onclick="window.assignRank()">UPDATE RANK</button>
+        </div>
+
+        <button class="mc-btn" onclick="window.logout()" style="margin-top:20px;">LOGOUT</button>
+        <a href="index.html" class="mc-btn" style="background:#555;">BACK</a>
+    </div>
+</body>
+</html>

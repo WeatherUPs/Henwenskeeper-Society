@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Henwenskeeper | Videos</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        // Video Database
+        const allVideos = [
+            { id: "qMRFJdgbJ44", title: "Chill practice", date: "2026-02-14" },
+            { id: "I_nQLyR5Ydg", title: "Again #pvp", date: "2026-02-13" },
+            { id: "oln05nm72Nc", title: "Chill", date: "2026-02-10" },
+            { id: "xTz4SRXC65M", title: "Me legit", date: "2025-07-15" },
+            { id: "JdICrvTj0dc", title: "Fight-kids", date: "2025-05-25" },
+            { id: "_IE83L-FnGc", title: "Number", date: "2024-11-21" }
+        ];
+
+        function createVideoCard(v) {
+            return `
+                <div class="grid-card" onclick="window.open('https://www.youtube.com/watch?v=${v.id}', '_blank')">
+                    <div class="card-thumb" style="background-image:url('https://img.youtube.com/vi/${v.id}/maxresdefault.jpg')"></div>
+                    <div class="card-info">
+                        <div style="font-size:16px; color:white; margin-bottom: 5px;">${v.title}</div>
+                        <div style="font-size:12px; color:#aaa;">Uploaded: ${v.date}</div>
+                    </div>
+                </div>`;
+        }
+
+        function loadVideos() {
+            const latestGrid = document.getElementById('latest-grid');
+            const archiveGrid = document.getElementById('archive-grid');
+            
+            latestGrid.innerHTML = "";
+            archiveGrid.innerHTML = "";
+
+            allVideos.forEach((v, index) => {
+                if (index < 2) {
+                    // First 2 go to Latest
+                    latestGrid.innerHTML += createVideoCard(v);
+                } else {
+                    // The rest go to Archive
+                    archiveGrid.innerHTML += createVideoCard(v);
+                }
+            });
+        }
+
+        window.onload = loadVideos;
+    </script>
+</head>
+<body>
+    <h1 class="title">VIDEOS</h1>
+
+    <div class="section-label" style="color: #55FF55;">LATEST UPLOADS</div>
+    <div id="latest-grid" class="grid-container"></div>
+
+    <div class="section-label" style="color: #AAAAAA; margin-top: 50px;">ALL VIDEOS</div>
+    <div id="archive-grid" class="grid-container"></div>
+
+    <div style="margin: 50px 0; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <a href="https://www.youtube.com/@Henwenskeeper" target="_blank" class="mc-btn" style="width: 300px; background: #FF0000; border-color: #CC0000;">SUBSCRIBE ON YOUTUBE</a>
+        <a href="index.html" class="mc-btn" style="width: 200px;">BACK TO MENU</a>
+    </div>
+</body>
+</html>

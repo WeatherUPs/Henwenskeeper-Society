@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Henwenskeeper | Events</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAi_ufBpDeiU-v2YWiY-jqyrgI5FHKG2HA",
+            authDomain: "henwenskeeper.firebaseapp.com",
+            projectId: "henwenskeeper",
+            storageBucket: "henwenskeeper.firebasestorage.app",
+            appId: "1:980447588400:web:ce0ca551246ae1ecc9fdf5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let isAdmin = false;
+
+        // AUTH CHECK: ONLY SHOW CREATE BUTTON TO ADMIN
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userSnap = await getDoc(doc(db, "users", user.uid));
+                if (userSnap.exists() && userSnap.data().rank === "Admin") {
+                    isAdmin = true;
+                    document.getElementById('admin-event-btn').style.display = 'block';
+                }
+            }
+        });
+
+        // LOAD EVENTS INTO GRID
+        const q = query(collection(db, "events"), orderBy("timestamp", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const grid = document.getElementById('events-grid');
+            grid.innerHTML = "";
+
+            snapshot.forEach((docSnap) => {
+                const e = docSnap.data();
+                grid.innerHTML += `
+                    <div class="grid-card" onclick="openEventDetail('${docSnap.id}')">
+                        <div class="card-thumb" style="background-image:url('${e.img || 'background.png'}')"></div>
+                        <div class="card-info">
+                            <div style="font-size:18px; color:#55FF55;">${e.title}</div>
+                            <div style="font-size:12px; color:#FFF;">Date: ${e.eventDate}</div>
+                        </div>
+                    </div>`;
+            });
+        });
+
+        // SAVE EVENT (ADMIN ONLY)
+        window.saveEvent = async () => {
+            const title = document.getElementById('event-title').value;
+            const date = document.getElementById('event-date-input').value;
+            const desc = document.getElementById('event-desc').value;
+            const img = document.getElementById('event-img').value || 'background.png';
+
+            if(!title || !date || !desc) return alert("Fill in all fields!");
+
+            await addDoc(collection(db, "events"), {
+                title, eventDate: date, description: desc, img, timestamp: Date.now()
+            });
+            closeModal();
+        };
+
+        // DETAIL MODAL
+        window.openEventDetail = async (id) => {
+            const docSnap = await getDoc(doc(db, "events", id));
+            const e = docSnap.data();
+            document.getElementById('det-title').innerText = e.title;
+            document.getElementById('det-date').innerText = "Scheduled for: " + e.eventDate;
+            document.getElementById('det-desc').innerText = e.description;
+            document.getElementById('event-detail-modal').style.display = 'flex';
+        };
+
+        window.closeModal = () => document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        window.showCreateModal = () => document.getElementById('event-create-modal').style.display = 'flex';
+
+    </script>
+</head>
+<body>
+    <h1 class="title">EVENTS</h1>
+
+    <div id="admin-event-btn" style="display:none; margin-bottom: 20px;">
+        <button class="mc-btn" style="width:260px; background:#3C8527;" onclick="showCreateModal()">+ SCHEDULE NEW EVENT</button>
+    </div>
+
+    <div id="events-grid" class="grid-container">
+        </div>
+
+    <a href="index.html" class="mc-btn" style="width:200px; margin-top:40px;">BACK</a>
+
+    <div id="event-create-modal" class="modal">
+        <div class="panel">
+            <h2 class="title" style="font-size:32px; margin-top:0;">NEW EVENT</h2>
+            <input type="text" id="event-title" placeholder="Event Name...">
+            <input type="text" id="event-date-input" placeholder="Date & Time (e.g. Saturday 5PM GMT)">
+            <textarea id="event-desc" placeholder="Event Details/Rules..." style="height:100px;"></textarea>
+            <input type="text" id="event-img" placeholder="Thumbnail Image URL">
+            
+            <button class="mc-btn" style="background:#3C8527;" onclick="saveEvent()">POST EVENT</button>
+            <button class="mc-btn" style="background:#800;" onclick="closeModal()">CANCEL</button>
+        </div>
+    </div>
+
+    <div id="event-detail-modal" class="modal">
+        <div class="panel">
+            <h2 id="det-title" style="color:#55FF55; margin-top:0;"></h2>
+            <h3 id="det-date" style="color:gold; font-size:16px;"></h3>
+            <p id="det-desc" style="background:rgba(0,0,0,0.5); padding:15px; border:1px solid #555; max-height:200px; overflow-y:auto;"></p>
+            <button class="mc-btn" onclick="closeModal()">CLOSE</button>
+        </div>
+    </div>
+</body>
+</html>
